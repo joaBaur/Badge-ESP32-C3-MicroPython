@@ -1,6 +1,7 @@
 from machine import Pin, I2C, PWM
 import time
 import framebuf
+import neopixel
 from ssd1306 import SSD1306_I2C
 
 # --- Konfiguration ---------------------------------------------------------
@@ -10,15 +11,19 @@ OLED_HEIGHT = 64
 OLED_SDA_PIN = 6  # D4
 OLED_SCL_PIN = 7  # D5
 
-BUZZER_PIN = 0
+BUZZER_PIN = 4
 
-# Taster -> (Pin, Ton, Anzeige-Text)
+LED_PIN = 5  # D3
+LED_COUNT = 4
+LED_BRIGHTNESS = 0.3
+
+# Taster -> (Pin, Ton, Anzeige-Text, Anzahl LEDs, LED-Farbe)
 # Noten C4-F4 in Hz
 BUTTONS = (
-    {"pin": 1, "freq": 262, "label": "1"},  # C
-    {"pin": 2, "freq": 294, "label": "2"},  # D
-    {"pin": 3, "freq": 330, "label": "3"},  # E
-    {"pin": 4, "freq": 349, "label": "4"},  # F
+    {"pin": 0, "freq": 262, "label": "4", "led_count": 1, "color": (0, 0, 255)},  # C, Blau
+    {"pin": 1, "freq": 294, "label": "3", "led_count": 2, "color": (0, 255, 0)},  # D, Gruen
+    {"pin": 2, "freq": 330, "label": "2", "led_count": 3, "color": (255, 0, 0)},  # E, Rot
+    {"pin": 3, "freq": 349, "label": "1", "led_count": 4, "color": (255, 255, 255)},  # F, Weiss
 )
 
 # --- Hardware initialisieren -------------------------------------------
@@ -28,6 +33,8 @@ oled = SSD1306_I2C(OLED_WIDTH, OLED_HEIGHT, i2c)
 
 buzzer = PWM(Pin(BUZZER_PIN))
 buzzer.duty(0)
+
+leds = neopixel.NeoPixel(Pin(LED_PIN), LED_COUNT)
 
 for button in BUTTONS:
     button["obj"] = Pin(button["pin"], Pin.IN, Pin.PULL_UP)
@@ -78,6 +85,19 @@ def stop_tone():
     buzzer.duty(0)
 
 
+def show_leds(count, color):
+    scaled = tuple(int(c * LED_BRIGHTNESS) for c in color)
+    for i in range(LED_COUNT):
+        leds[i] = scaled if i < count else (0, 0, 0)
+    leds.write()
+
+
+def clear_leds():
+    for i in range(LED_COUNT):
+        leds[i] = (0, 0, 0)
+    leds.write()
+
+
 # --- Hauptprogramm -------------------------------------------------------
 
 show_hello_world()
@@ -93,6 +113,7 @@ while True:
             # Flanke erkannt: Taster wurde gerade gedrueckt
             play_tone(button["freq"])
             show_number(button["label"])
+            show_leds(button["led_count"], button["color"])
             time.sleep_ms(20)  # einfaches Entprellen
 
         if pressed:
@@ -104,6 +125,7 @@ while True:
         stop_tone()
         if was_any_pressed:
             show_hello_world()
+            clear_leds()
 
     was_any_pressed = any_pressed
     time.sleep_ms(10)
